@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SIGEC - SISTEMA INTEGRAL DE GEOLOCALIZACIÓN CRIMINAL</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="shortcut icon" href="GIF LOGO.gif" type="image/x-icon" />
+  <style>
+    /* --- Aquí va todo tu CSS tal cual --- */
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8; 
+      color: #222;
+    }
+    /* Preloader */
+    #preloader {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    #preloader img {
+      width: 120px;
+      height: auto;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.1); opacity: 1; }
+      100% { transform: scale(1); opacity: 0.8; }
+    }
+    header {
+       background: #2a9d8f; 
+      color: white;
+      padding: 1rem;
+    }
+    header .encabezado {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    header img {
+      height: 100px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      text-align: center;
+    }
+    #posicion-container {
+      width: 750px;
+      margin: 1rem auto;
+      text-align: center;
+    }
+    a { color: #0077cc; text-decoration: underline; }
+    #map { height: 70vh; border-bottom: 2px solid #ccc; }
+    #formulario {
+      padding: 1rem 1.5rem;
+      background: #C7F9CC;
+      max-width: 600px;
+      margin: 0 auto 2rem auto;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    label { margin-top: 0.8rem; display: block; font-weight: 600; color: #003366; }
+    input, select, button {
+      width: 100%; max-width: 600px; padding: 0.6rem; margin-top: 0.3rem;
+      border: 1px solid #ccc; border-radius: 6px; font-size: 1rem;
+      box-sizing: border-box; transition: border-color 0.3s ease;
+    }
+    input:focus, select:focus { border-color: #0077cc; outline: none; box-shadow: 0 0 5px rgba(0,119,204,0.5); }
+    button {
+      margin-top: 1.2rem; background-color: #00509e; color: white; border: none;
+      cursor: pointer; font-weight: 600; border-radius: 6px; transition: background-color 0.3s ease;
+    }
+    button:hover { background-color: #003d66; }
+    #borrarBtn { background-color: #b40000; margin-top: 1rem; max-width: 600px; display: block; margin-left: auto; margin-right: auto; }
+    #borrarBtn:hover { background-color: #800000; }
+    #toggleSeguimiento {
+      display: block; width: 180px; margin: 1rem auto; background-color: #228b22;
+      border-radius: 6px; color: white; font-weight: 600; border: none; cursor: pointer; transition: background-color 0.3s ease;
+    }
+    #toggleSeguimiento.seguimiento-activo { background-color: #b36b00; }
+    ul#listaDelitos {
+      max-width: 600px; margin: 1rem auto; padding-left: 1rem; list-style: none;
+    }
+    ul#listaDelitos li {
+      background: #cdebf9; margin-bottom: 1rem; padding: 0.8rem 1rem;
+      border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); color: #003366;
+    }
+    small { color: #555; }
+    @media (max-width: 650px) {
+      #formulario, ul#listaDelitos {
+        padding: 0 1rem; max-width: 100%;
+      }
+      #posicion-container { width: 100%; padding: 0 1rem; }
+    }
+    .leaflet-control-attribution { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- PRELOADER -->
+<div id="preloader">
+  <img src="LOGO2.png" alt="Cargando SIGEC..." />
+</div>
+
+<header>
+  <div class="encabezado">
+    <a href="GIF LOGO.gif" class="logo"><img src="LOGO2.png" alt="Ir al logo principal" /></a>
+    <h1>SIGEC - SISTEMA INTEGRAL DE GEOLOCALIZACIÓN CRIMINAL</h1>
+  </div>
+</header>
+
+<div id="posicion-container">
+  <p>Tu posición es: <span id="Pos">Desconocida</span></p>
+  <p id="PosLink"><a target="_blank" href="#"></a></p>
+</div>
+
+<div id="map"></div>
+
+<button id="toggleSeguimiento" onclick="toggleSeguimiento()">🔵 Activar seguimiento</button>
+
+<section id="formulario">
+  <h2>Registrar Delito</h2>
+  <form id="crimeForm" autocomplete="off">
+    <label for="nombre">Nombre completo:</label>
+    <input type="text" id="nombre" placeholder="Ejemplo: Juan Pérez" />
+    <label for="edad">Edad:</label>
+    <input type="number" id="edad" min="1" max="120" placeholder="Ejemplo: 30" />
+    <label for="sexo">Sexo:</label>
+    <select id="sexo">
+      <option value="" disabled selected>Selecciona</option>
+      <option value="Masculino">Masculino</option>
+      <option value="Femenino">Femenino</option>
+      <option value="Otro">Otro</option>
+    </select>
+
+    <label>
+      <input type="checkbox" id="anonimo" />
+      Registrar anónimamente
+    </label>
+
+    <label for="tipo">Tipo de delito:</label>
+    <select id="tipo" required onchange="mostrarOtroDelito(this.value)">
+      <option value="" disabled selected>Selecciona un delito</option>
+      <option value="Robo">Robo</option>
+      <option value="Asalto">Asalto</option>
+      <option value="Homicidio">Homicidio</option>
+      <option value="Secuestro">Secuestro</option>
+      <option value="Violación">Violación</option>
+      <option value="Extorsión">Extorsión</option>
+      <option value="Narcotráfico">Narcotráfico</option>
+      <option value="Fraude">Fraude</option>
+      <option value="Violencia familiar">Violencia familiar</option>
+      <option value="Otro">Otro</option>
+    </select>
+    <div id="otroDelitoContainer" style="display:none; margin-top:0.5rem;">
+      <label for="otroDelito">Especificar otro delito:</label>
+      <input type="text" id="otroDelito" placeholder="Describe el delito" />
+    </div>
+    <label for="descripcion">Descripción:</label>
+    <input type="text" id="descripcion" required placeholder="Ej. Robo con violencia en zona centro" />
+    <input type="hidden" id="lat" />
+    <input type="hidden" id="lng" />
+    <button type="submit">Registrar Delito</button>
+  </form>
+  <p><strong>Nota:</strong> Haz clic en el mapa para seleccionar la ubicación del delito.</p>
+  <button id="borrarBtn" onclick="limpiarDelitos()">🗑️ Borrar todos los delitos</button>
+  <h3>Delitos registrados:</h3>
+  <ul id="listaDelitos"></ul>
+</section>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+  window.addEventListener('load', () => document.getElementById('preloader').style.display = 'none');
+
+  let map, userMarker, selectedMarker, watchId;
+  let delitos = [];
+  const posElt = document.getElementById('Pos');
+  const posLinkElt = document.querySelector('#PosLink > a');
+  const listaDelitos = document.getElementById('listaDelitos');
+
+  const delitoColores = {};
+  const paletaColores = [
+    "#e6194b","#3cb44b","#ffe119","#4363d8","#f58231",
+    "#911eb4","#46f0f0","#f032e6","#bcf60c","#fabebe",
+    "#008080","#e6beff","#9a6324","#fffac8","#800000",
+    "#aaffc3","#808000","#ffd8b1","#000075","#808080"
+  ];
+  let colorIndex = 0;
+  function obtenerColorDelito(tipo) {
+    if (!delitoColores[tipo]) delitoColores[tipo] = paletaColores[colorIndex++ % paletaColores.length];
+    return delitoColores[tipo];
+  }
+
+  function actualizarPosicion(lat, lng) {
+    posElt.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    posLinkElt.href = `https://maps.google.com/?q=${lat},${lng}`;
+    posLinkElt.textContent = 'Mostrar tu posición en un mapa';
+  }
+
+  function crearIconoColor(color) {
+    return L.divIcon({
+      html: `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="42" viewBox="0 0 30 42">
+        <path d="M15 0C9 0 4 6 4 12c0 9 11 30 11 30s11-21 11-30c0-6-5-12-11-12z" fill="${color}" stroke="#333" stroke-width="1"/>
+        <circle cx="15" cy="12" r="6" fill="white"/>
+      </svg>`,
+      className:'', iconSize:[30,42], iconAnchor:[15,42], popupAnchor:[0,-45]
+    });
+  }
+
+  function iniciarMapa(lat, lng) {
+    map = L.map('map',{ attributionControl:false }).setView([lat, lng],13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
+    userMarker = L.marker([lat,lng]).addTo(map).bindPopup("Tu ubicación actual").openPopup();
+    actualizarPosicion(lat,lng);
+    map.on("click", e => {
+      const {lat,lng} = e.latlng;
+      if (selectedMarker) map.removeLayer(selectedMarker);
+      selectedMarker = L.marker([lat,lng],{draggable:true}).addTo(map).bindPopup("Ubicación del delito").openPopup();
+      document.getElementById("lat").value = lat.toFixed(6);
+      document.getElementById("lng").value = lng.toFixed(6);
+    });
+    delitos = JSON.parse(localStorage.getItem("delitos")||"[]");
+    delitos.forEach(d => {
+      const color = obtenerColorDelito(d.tipo);
+      let infoPopup = `<strong>${d.tipo}</strong><br>${d.descripcion}<br>`;
+      if (!d.anonimo) {
+        infoPopup += `<em>${d.nombre}, ${d.edad} años, ${d.sexo}</em><br>`;
+      } else {
+        infoPopup += `<em><small>Registrado de forma anónima</small></em><br>`;
+      }
+      infoPopup += `<small>${d.fechaHora}</small>`;
+      L.marker([+d.lat,+d.lng], {icon: crearIconoColor(color)}).addTo(map).bindPopup(infoPopup);
+      agregarDelitoALista(d);
+    });
+  }
+
+  if ("geolocation" in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      pos => iniciarMapa(pos.coords.latitude, pos.coords.longitude),
+      () => iniciarMapa(19.4326, -99.1332)
+    );
+  } else {
+    iniciarMapa(19.4326, -99.1332);
+  }
+
+  function mostrarOtroDelito(valor) {
+    const cont = document.getElementById("otroDelitoContainer");
+    cont.style.display = valor==="Otro"?"block":"none";
+    document.getElementById("otroDelito").required = valor==="Otro";
+  }
+
+  function agregarDelitoALista(d) {
+    const li = document.createElement("li");
+    let texto = `<strong>${d.tipo}</strong>: ${d.descripcion}<br>`;
+    if (!d.anonimo) {
+      texto += `<small><em>${d.nombre}, ${d.edad} años, ${d.sexo}</em></small><br>`;
+    } else {
+      texto += `<small><em>Registrado de forma anónima</em></small><br>`;
+    }
+    texto += `<small>Ubicación: ${parseFloat(d.lat).toFixed(5)}, ${parseFloat(d.lng).toFixed(5)}</small><br>`;
+    texto += `<small>Fecha: ${d.fechaHora}</small>`;
+    li.innerHTML = texto;
+    listaDelitos.appendChild(li);
+  }
+
+  document.getElementById("crimeForm").addEventListener("submit", e => {
+    e.preventDefault();
+const anonimo = document.getElementById("anonimo").checked;
+let nombre = document.getElementById("nombre").value.trim();
+let edad = document.getElementById("edad").value.trim();
+let sexo = document.getElementById("sexo").value;
+let tipo = document.getElementById("tipo").value;
+if(tipo === "Otro") {
+  tipo = document.getElementById("otroDelito").value.trim();
+  if (!tipo) {
+    alert("Por favor, especifica el otro delito.");
+    return;
+  }
+}
+
+const descripcion = document.getElementById("descripcion").value.trim();
+const lat = document.getElementById("lat").value;
+const lng = document.getElementById("lng").value;
+
+if (!lat || !lng) {
+  alert("Por favor, selecciona la ubicación del delito haciendo clic en el mapa.");
+  return;
+}
+
+if (!descripcion) {
+  alert("Por favor, proporciona una descripción del delito.");
+  return;
+}
+
+// Si NO es anónimo, validamos que nombre, edad y sexo estén completos
+if (!anonimo) {
+  if (!nombre) {
+    alert("Por favor, ingresa tu nombre completo o marca la opción de registro anónimo.");
+    return;
+  }
+  if (!edad || isNaN(edad) || edad < 1 || edad > 120) {
+    alert("Por favor, ingresa una edad válida (entre 1 y 120) o marca la opción de registro anónimo.");
+    return;
+  }
+  if (!sexo) {
+    alert("Por favor, selecciona tu sexo o marca la opción de registro anónimo.");
+    return;
+  }
+} else {
+  // Si es anónimo, limpiamos datos personales para guardar
+  nombre = "";
+  edad = "";
+  sexo = "";
+}
+
+const fechaHora = new Date().toLocaleString();
+
+const nuevoDelito = {
+  nombre,
+  edad,
+  sexo,
+  tipo,
+  descripcion,
+  lat,
+  lng,
+  fechaHora,
+  anonimo
+};
+
+// Guardamos en el array y localStorage
+delitos.push(nuevoDelito);
+localStorage.setItem("delitos", JSON.stringify(delitos));
+
+// Agregamos el marcador al mapa
+const color = obtenerColorDelito(tipo);
+let infoPopup = `<strong>${tipo}</strong><br>${descripcion}<br>`;
+if (!anonimo) {
+  infoPopup += `<em>${nombre}, ${edad} años, ${sexo}</em><br>`;
+} else {
+  infoPopup += `<em><small>Registrado de forma anónima</small></em><br>`;
+}
+infoPopup += `<small>${fechaHora}</small>`;
+L.marker([+lat, +lng], {icon: crearIconoColor(color)}).addTo(map).bindPopup(infoPopup);
+
+// Agregamos a la lista visual
+agregarDelitoALista(nuevoDelito);
+
+// Reseteamos formulario y marcador de ubicación
+document.getElementById("crimeForm").reset();
+document.getElementById("otroDelitoContainer").style.display = "none";
+if (selectedMarker) {
+  map.removeLayer(selectedMarker);
+  selectedMarker = null;
+}
+document.getElementById("lat").value = "";
+document.getElementById("lng").value = "";
+alert("Delito registrado con éxito.");
+});
+  
+// Función para borrar todos los delitos
+function limpiarDelitos() {
+  if(confirm("¿Estás seguro de borrar todos los delitos? Esta acción no se puede deshacer.")) {
+    delitos = [];
+    localStorage.removeItem("delitos");
+    listaDelitos.innerHTML = "";
+    map.eachLayer(layer => {
+      if (layer instanceof L.Marker && layer !== userMarker && layer !== selectedMarker) {
+        map.removeLayer(layer);
+      }
+    });
+    alert("Todos los delitos han sido borrados.");
+  }
+}
+
+// Seguimiento de posición
+let seguimientoActivo = false;
+const toggleBtn = document.getElementById("toggleSeguimiento");
+function toggleSeguimiento() {
+  if (seguimientoActivo) {
+    navigator.geolocation.clearWatch(watchId);
+    seguimientoActivo = false;
+    toggleBtn.textContent = "🔵 Activar seguimiento";
+    toggleBtn.classList.remove("seguimiento-activo");
+  } else {
+    if ("geolocation" in navigator) {
+      watchId = navigator.geolocation.watchPosition(pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        userMarker.setLatLng([lat, lng]);
+        map.setView([lat, lng]);
+        actualizarPosicion(lat, lng);
+      }, err => {
+        alert("Error al obtener ubicación para seguimiento.");
+      }, { enableHighAccuracy: true, maximumAge: 10000 });
+      seguimientoActivo = true;
+      toggleBtn.textContent = "🟠 Desactivar seguimiento";
+      toggleBtn.classList.add("seguimiento-activo");
+    } else {
+      alert("La geolocalización no está disponible en este navegador.");
+    }
+  }
+}
+</script>
+
+</body>
+</html>
